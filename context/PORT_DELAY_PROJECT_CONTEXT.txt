@@ -679,7 +679,7 @@ CURRENT STATUS:
   Stage 1: COMPLETE
   Stage 2: COMPLETE
   Stage 3: COMPLETE
-  Stage 4: NOT STARTED
+  Stage 4: COMPLETE
   Stage 5: NOT STARTED
   Stage 6: NOT STARTED
 
