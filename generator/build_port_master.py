@@ -114,9 +114,15 @@ CPPI_LOCODE_MAP = {
 }
 
 # Ports with no CPPI equivalent — assign using nearest comparable port
+# YEATH 2020: Aden not tracked until 2021; use 2021 value as proxy
 CPPI_FALLBACK = {
     "IRBND": {"CPPI 2020": 60, "CPPI 2021": 30, "CPPI 2022": 25, "CPPI 2023": 40, "CPPI 2024": 20},
     "USNFK": {"CPPI 2020": 55, "CPPI 2021": 10, "CPPI 2022": -80, "CPPI 2023": 30, "CPPI 2024": 5},
+}
+
+# Per-year CPPI overrides for specific ports/years missing from the annex
+CPPI_YEAR_OVERRIDES = {
+    ("YEATH", 2020): -21,   # Aden: no 2020 data in CPPI; use 2021 value (-21) as nearest proxy
 }
 
 # ---------------------------------------------------------------------------
@@ -139,20 +145,33 @@ LSCI_2023 = {
 # 4. GPR country column mapping (ISO3 → column name in gpr_data.xls)
 # ---------------------------------------------------------------------------
 GPR_COL_MAP = {
-    "CHN": "GPRHC_CHN", "SGP": "GPRHC_MYS",  # Singapore not in GPR, use Malaysia proxy
+    # Direct matches (country has its own column in the GPR dataset)
+    "CHN": "GPRHC_CHN",
     "KOR": "GPRHC_KOR", "DEU": "GPRHC_DEU", "NLD": "GPRHC_NLD",
     "BEL": "GPRHC_BEL", "JPN": "GPRHC_JPN", "MYS": "GPRHC_MYS",
     "USA": "GPRHC_USA", "ESP": "GPRHC_ESP", "GBR": "GPRHC_GBR",
     "FRA": "GPRHC_FRA", "ITA": "GPRHC_ITA", "TWN": "GPRHC_TWN",
-    "ARE": "GPRHC_SAU",  # UAE not in GPR, use Saudi Arabia proxy
-    "GRC": None,         # use global GPR
-    "CAN": "GPRHC_CAN", "PAN": None, "EGY": None, "IND": "GPRHC_IND",
-    "VNM": None, "BRA": "GPRHC_BRA", "OMN": None, "SAU": "GPRHC_SAU",
-    "THA": "GPRHC_THA", "LKA": None, "IDN": "GPRHC_IDN", "MEX": "GPRHC_MEX",
-    "PHL": "GPRHC_PHL", "ZAF": "GPRHC_ZAF", "COL": "GPRHC_COL",
-    "MAR": None, "PAK": None, "IRN": None, "KEN": None,
-    "POL": None, "ROU": None, "YEM": None, "HKG": "GPRHC_HKG",
-    "AUS": "GPRHC_AUS",
+    "SAU": "GPRHC_SAU", "CAN": "GPRHC_CAN", "IND": "GPRHC_IND",
+    "BRA": "GPRHC_BRA", "THA": "GPRHC_THA", "IDN": "GPRHC_IDN",
+    "MEX": "GPRHC_MEX", "PHL": "GPRHC_PHL", "ZAF": "GPRHC_ZAF",
+    "COL": "GPRHC_COL", "HKG": "GPRHC_HKG", "AUS": "GPRHC_AUS",
+    # Now directly available in the updated GPR file (gpr_updated.xls)
+    "EGY": "GPRHC_EGY",   # Egypt — critical for Port Said / Red Sea analysis
+    "VNM": "GPRHC_VNM",   # Vietnam — Ho Chi Minh City
+    "POL": "GPRHC_POL",   # Poland — Gdansk
+    # Regional proxies — nearest country with direct GPR coverage
+    "SGP": "GPRHC_MYS",   # Singapore → Malaysia (same maritime sub-region)
+    "ARE": "GPRHC_SAU",   # UAE → Saudi Arabia (Gulf Co-operation Council)
+    "OMN": "GPRHC_SAU",   # Oman → Saudi Arabia (Gulf region)
+    "GRC": "GPRHC_ITA",   # Greece → Italy (Mediterranean)
+    "ROU": "GPRHC_TUR",   # Romania → Turkey (Black Sea / Eastern Med)
+    "LKA": "GPRHC_IND",   # Sri Lanka → India (South Asia)
+    "PAK": "GPRHC_IND",   # Pakistan → India (South Asia)
+    "MAR": "GPRHC_ESP",   # Morocco → Spain (North Africa / Med)
+    "IRN": "GPRHC_TUR",   # Iran → Turkey (Middle East / regional)
+    "KEN": "GPRHC_ZAF",   # Kenya → South Africa (Sub-Saharan Africa)
+    "YEM": "GPRHC_SAU",   # Yemen → Saudi Arabia (Red Sea / Gulf conflict zone)
+    "PAN": "GPRHC_COL",   # Panama → Colombia (Latin America)
 }
 
 
@@ -185,6 +204,11 @@ def build():
             cppi_2022 = row["CPPI 2022"]
             cppi_2023 = row["CPPI 2023"]
             cppi_2024 = row["CPPI 2024"]
+            # Apply per-year overrides for missing data points
+            for (lc, yr), val in CPPI_YEAR_OVERRIDES.items():
+                if lc == locode:
+                    if yr == 2020: cppi_2020 = val if (cppi_2020 is None or (isinstance(cppi_2020, float) and pd.isna(cppi_2020))) else cppi_2020
+                    if yr == 2021: cppi_2021 = val if (cppi_2021 is None or (isinstance(cppi_2021, float) and pd.isna(cppi_2021))) else cppi_2021
         elif locode in CPPI_FALLBACK:
             fb = CPPI_FALLBACK[locode]
             cppi_2020 = fb["CPPI 2020"]

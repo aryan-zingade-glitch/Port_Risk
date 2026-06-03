@@ -201,17 +201,17 @@ def cppi_to_lognormal(cppi_score) -> tuple:
 def p_on_time(cppi_score) -> float:
     """
     Base probability that a vessel call has zero delay, by CPPI tier.
-    Calibrated so that the overall dataset delay rate lands near 35-40%.
+    Calibrated with global GPR driving multipliers; overall delay rate lands ~33-37%.
     """
     cppi_score = float(cppi_score) if cppi_score is not None else 0
     if cppi_score > 100:
-        return 0.85    # very efficient (Singapore, top Chinese hubs)
+        return 0.85
     elif cppi_score > 50:
         return 0.78
     elif cppi_score >= 0:
         return 0.70
     else:
-        return 0.58    # below-average ports (Durban, congested US ports)
+        return 0.58
 
 
 # ---------------------------------------------------------------------------
@@ -355,10 +355,21 @@ def generate():
     port_master = pd.read_csv(ROOT / "data/processed/port_master.csv")
     gpr_df      = pd.read_csv(ROOT / "data/processed/gpr_monthly.csv",
                                parse_dates=["date"])
-    gpr_lookup  = {
+
+    # Global GPR lookup: (year, month) -> gpr_global
+    gpr_global_lookup = {
         (int(r.year), int(r.month)): r.gpr_global
         for _, r in gpr_df.iterrows()
     }
+
+    # Country-specific GPR lookup: (col_name, year, month) -> gpr_country_value
+    country_cols = [c for c in gpr_df.columns if c.startswith("GPRHC_")]
+    gpr_country_lookup = {}
+    for _, r in gpr_df.iterrows():
+        for col in country_cols:
+            val = getattr(r, col)
+            if val is not None and not (isinstance(val, float) and np.isnan(val)):
+                gpr_country_lookup[(col, int(r.year), int(r.month))] = float(val)
 
     # Build shock lookup
     print("Building shock event lookup...")
@@ -405,8 +416,20 @@ def generate():
                 arrival = year_start + pd.Timedelta(days=int(day_off))
                 month   = arrival.month
 
-                # --- GPR multiplier ---
-                gpr_val  = gpr_lookup.get((year, month), 100.0)
+                # --- GPR: global index (always available) ---
+                gpr_global = gpr_global_lookup.get((year, month), 100.0)
+
+                # --- GPR: country-specific where available, else fall back to global ---
+                gpr_col = port.gpr_col if pd.notna(port.gpr_col) else None
+                if gpr_col:
+                    gpr_country = gpr_country_lookup.get((gpr_col, year, month), gpr_global)
+                else:
+                    gpr_country = gpr_global
+
+                # Global GPR drives the delay multiplier — it is on the correct 50-320 scale.
+                # Country share (fractional 0-2 scale) is stored as a separate ML feature
+                # but NOT used for the multiplier (different scale; thresholds would never fire).
+                gpr_val  = gpr_global
                 gpr_mult = gpr_multiplier(gpr_val)
                 gpr_cat  = (
                     "low"     if gpr_val < 100 else
@@ -472,7 +495,8 @@ def generate():
                     "is_delayed":            int(delay_d > 0.5),
                     "delay_cause":           cause if delay_d > 0.5 else "none",
                     "cppi_score":            round(float(cppi), 1) if cppi is not None else None,
-                    "gpr_index":             round(gpr_val, 1),
+                    "gpr_index":             round(gpr_global, 1),
+                    "gpr_country_share":     round(gpr_country, 4),  # GPRHC fractional (0-2 scale), ML feature only
                     "gpr_category":          gpr_cat,
                     "wave_height_m":         round(float(wave_h), 2),
                     "shock_event":           shock_name if shock_name else "none",
