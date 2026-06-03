@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.env
+
+# Data files (large — add manually if needed)
+data/raw/
+data/weather/
+data/processed/
+
+# Models
+models/*.pkl
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node
+dashboard/node_modules/
+dashboard/dist/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,705 @@
+================================================================================
+PORT DELAY PREDICTION — PROJECT CONTEXT FILE
+For: Aryan Zingade | Final Year CS + Data Science, Manipal Bangalore
+Created: June 2026 | Continue in: Claude Code (VS Code)
+================================================================================
+
+READ THIS FIRST — HOW TO USE THIS FILE
+--------------------------------------------------------------------------------
+Feed this file to Claude Code at the start of every session.
+Command: "Read PORT_DELAY_PROJECT_CONTEXT.txt before we begin."
+This file is the single source of truth. Update it as decisions are made.
+
+
+================================================================================
+SECTION 1 — WHO THIS IS FOR AND WHY
+================================================================================
+
+DEVELOPER: Aryan Zingade
+- Final year B.Tech CS + Data Science, Manipal University Bangalore
+- Previous project: agritech-fleet-dashboard.streamlit.app (crop yield prediction,
+  Maharashtra, R²=0.46 — lessons learned, not continuing)
+- Goal: Flagship resume project for campus placements in ~5-6 months
+- Long-term plan: Join as data scientist → MBA → switch to Operations/SCM
+
+TARGET COMPANIES (in priority order):
+1. Maersk (anchor company — highest priority)
+   - Technology Centre in Bengaluru (2,900 tech professionals)
+   - They built PortSight: AI platform predicting port delays 7 days ahead
+   - They built Star Connect: processes 2.5B IoT data points for voyage risk
+   - This project directly mirrors their real product problems
+2. Bosch (RBEI Bengaluru — largest Bosch software centre outside Germany)
+   - Active ML/data science hiring for predictive analytics roles
+3. ABB (industrial automation, anomaly detection, sensor ML)
+
+MBA TARGET: ISB / IIM / MIT Sloan (Operations/SCM specialisation)
+Maersk as first employer + this project = straight-line MBA narrative.
+
+ROLE TARGET: Open to anything technical (DS, ML, SWE with ML exposure)
+
+NON-NEGOTIABLE DESIGN PRINCIPLES (agreed in planning session):
+- Flagship quality: this goes directly on resume, built like a product not a project
+- Verify every data source before writing a single line of code
+- Beautiful, visually appealing frontend — not a Streamlit dashboard
+- ML choices must be clear, justified, and defensible in interviews
+- Synthetic data is used where real data is paywalled — but rigorously calibrated
+- Every assumption in the synthetic generator must be documented
+
+
+================================================================================
+SECTION 2 — PROJECT OVERVIEW
+================================================================================
+
+PROJECT NAME: PortRisk — Global Port Delay Intelligence System
+(Name is a suggestion, Aryan to confirm)
+
+CORE PROBLEM STATEMENT:
+Predict the risk and magnitude of container port delays worldwide using
+publicly available data and principled synthetic generation — mirroring the
+problem Maersk's PortSight platform solves commercially.
+
+THREE PREDICTION TARGETS (layered system):
+  Target A — Will this vessel call be delayed? (binary classification)
+  Target B — How many days of delay? (regression)
+  Target C — What is this port's risk score for the next 30 days? (0-100 score,
+             derived from A + B, updated weekly)
+
+THE INTERVIEW NARRATIVE (memorise this):
+"Enterprise port congestion data costs $500+/month from providers like Portcast
+and Kpler. I built a calibrated synthetic generator anchored to three real public
+datasets — the World Bank CPPI (403 ports, 2020-2024), the Caldara-Iacoviello
+Geopolitical Risk Index (monthly, 1985-present), and Open-Meteo marine weather
+(free REST API, global coverage). Every distributional assumption is documented
+and justified. The synthetic generator is open-sourced as part of the project.
+Solving data problems with principled methodology is the job."
+
+
+================================================================================
+SECTION 3 — DATA SOURCES (ALL VERIFIED FREE AND ACCESSIBLE)
+================================================================================
+
+--- REAL ANCHOR 1: World Bank Container Port Performance Index (CPPI) ---
+URL: https://openknowledge.worldbank.org/entities/publication/fa57ba78-0402-4eb4-b168-51708cf526f7
+What it is: Annual efficiency scores for 403 global container ports, 2020-2024
+Key metric: Total port hours per vessel call (lower = better)
+Coverage: 175,000+ vessel calls, 247 million container moves
+License: CC BY 3.0 IGO (fully open, free to use with attribution)
+Format: PDF report + linked underlying Excel/CSV dataset
+How to get it: Download from World Bank Open Knowledge portal (no auth required)
+What we use it for:
+  - Base delay distribution per port (high CPPI score = tight distribution,
+    low CPPI score = fat-tailed distribution)
+  - Port efficiency ranking as a feature in ML models
+  - Validation anchor for synthetic generator output
+
+--- REAL ANCHOR 2: Geopolitical Risk (GPR) Index ---
+URL: https://www.matteoiacoviello.com/gpr.htm
+Also (newer, daily resolution): https://www.matteoiacoviello.com/ai_gpr.html
+What it is: Monthly index of geopolitical risk built from newspaper article counts
+Authors: Dario Caldara (Fed) + Matteo Iacoviello (Fed/Harvard)
+Coverage: Monthly from 1985 to present. AI-GPR version: daily, 1960-present
+Country-level: Yes, bilateral country pairs available
+License: Freely available with attribution (academic, Fed working paper)
+Format: Excel + CSV direct download, no auth required
+How to get it: Direct download link on matteoiacoviello.com
+What we use it for:
+  - Shock injection into synthetic delay generator
+  - GPR spike = delay distribution widens and shifts right at affected ports
+  - Red Sea crisis (late 2023), COVID (2021), Suez (2021) all captured
+  - Feature in ML models: GPR at port's country, month of voyage
+
+--- REAL ANCHOR 3: Open-Meteo Marine Weather API ---
+URL: https://open-meteo.com/en/docs/marine-weather-api
+What it is: Global marine weather — wave height, wind speed, sea surface temp
+Coverage: Global, any lat/long coordinate, historical back to ~1980
+License: Free for non-commercial use, no API key required
+Format: JSON/CSV via REST API, query by lat/lon + date range
+How to get it: Direct API call, no registration
+Example call:
+  https://marine-api.open-meteo.com/v1/marine?
+  latitude=1.29&longitude=103.85&
+  hourly=wave_height,wind_speed_10m&
+  start_date=2022-01-01&end_date=2022-12-31
+What we use it for:
+  - Weather conditions at each port on each vessel call date
+  - Wave height > 3m = delay multiplier (calibrated from maritime ops research)
+  - Feature in ML models: wave_height, wind_speed at arrival
+
+--- SUPPLEMENTARY: World Bank Logistics Performance Index (LPI) ---
+URL: https://lpi.worldbank.org/
+What it is: Country-level logistics quality scores, last published 2023
+Coverage: 139 countries
+License: Open data
+What we use it for: Country-level logistics quality as a port feature
+
+--- SUPPLEMENTARY: UNCTAD Liner Shipping Connectivity Index ---
+URL: https://unctadstat.unctad.org/
+What it is: Country connectivity to global shipping networks
+Coverage: Annual, country-level
+License: Free download
+What we use it for: Port's country connectivity as a structural feature
+
+--- NOT USING (confirmed paywalled) ---
+- Portcast: $500+/month, no free tier, no API for students
+- Kpler / MarineTraffic: Enterprise pricing, thousands/month
+  (Academic program exists — worth a cold email AFTER project is built,
+   could upgrade the project post-completion)
+- Beacon: Contact-sales, no published pricing, enterprise only
+- Spire: Enterprise satellite AIS, not accessible
+- NOAA AIS: Free but US waters only — not globally representative enough
+
+
+================================================================================
+SECTION 4 — SYNTHETIC DATA GENERATOR DESIGN
+================================================================================
+
+PURPOSE: Generate ~50,000 synthetic vessel call records (2020-2024) for
+60 major global ports, with realistic delay distributions calibrated to
+real-world anchors.
+
+THIS IS NOT RANDOM DATA. Every distribution is justified and documented.
+
+--- PORT SELECTION (60 ports) ---
+Select top ports by TEU throughput across all major trade regions:
+  Asia-Pacific (20): Shanghai, Singapore, Ningbo, Shenzhen, Busan, Hong Kong,
+    Guangzhou, Qingdao, Tianjin, Port Klang, Tanjung Pelepas, Jakarta,
+    Kaohsiung, Tokyo, Osaka, Manila, Ho Chi Minh City, Laem Chabang,
+    Colombo, Mumbai
+  Europe (15): Rotterdam, Antwerp, Hamburg, Felixstowe, Valencia, Algeciras,
+    Piraeus, Genoa, Le Havre, Bremerhaven, Gdansk, Gioia Tauro,
+    Barcelona, Marseille, Constanta
+  Middle East / Africa (10): Jebel Ali, Port Said, Salalah, Dammam,
+    Mombasa, Durban, Tanger Med, Aden, Bandar Abbas, Karachi
+  Americas (15): Los Angeles, Long Beach, New York, Savannah, Houston,
+    Santos, Manzanillo (MX), Cartagena (CO), Colon, Vancouver,
+    Seattle, Baltimore, Charleston, Norfolk, Lazaro Cardenas
+
+--- BASE DELAY DISTRIBUTION (calibrated to CPPI) ---
+For each port, derive base parameters from CPPI score:
+
+  CPPI score mapping (approximate, based on published CPPI data):
+  - Top 10% ports (score > 80):   mean_delay = 0.5d,  std = 0.8d  (e.g. Yangshan, Tanjung Pelepas)
+  - Top 25% ports (score 65-80):  mean_delay = 1.2d,  std = 1.5d
+  - Middle 50% ports (score 40-65): mean_delay = 2.5d, std = 2.8d
+  - Bottom 25% ports (score < 40): mean_delay = 4.5d,  std = 4.2d  (e.g. some LA, African ports)
+
+  Use log-normal distribution (not normal) — delay can't be negative,
+  real delay distributions are right-skewed. This is documented in maritime
+  ops literature (cite: CPPI methodology note + Notteboom et al. 2020).
+
+  Delay = 0 for ~35% of vessel calls (no delay) — calibrated from CPPI data
+  showing average schedule reliability was ~65% in 2021-2022.
+
+--- SHOCK INJECTION (calibrated to GPR + known events) ---
+Apply multiplicative shock factor to delay distributions based on:
+
+  1. GPR monthly index:
+     - GPR < 100 (baseline): multiplier = 1.0
+     - GPR 100-150: multiplier = 1.3
+     - GPR 150-200: multiplier = 1.8
+     - GPR > 200 (major event): multiplier = 2.5
+     Geographic targeting: high GPR in region X → ports in that region affected
+
+  2. Hard-coded known shock events (with date ranges and affected ports):
+     - COVID-19 global disruption: Jan 2020 - Dec 2021
+       Effect: All ports, multiplier 1.5-2.5 (peaks in Q2 2020, Q1 2021)
+     - Suez Canal blockage (Ever Given): March 23-29, 2021
+       Effect: Mediterranean + European ports, spike multiplier 3.0 for 3 weeks
+     - US West Coast port congestion: Oct 2021 - Mar 2022
+       Effect: LA/Long Beach, multiplier 3.5-4.0
+     - Red Sea / Houthi crisis: Dec 2023 - present
+       Effect: Suez-routing ports (Port Said, Jebel Ali, Singapore),
+       multiplier 2.0-2.8, rerouting adds ~14 days Cape of Good Hope bypass
+     - Panama Canal drought restrictions: Q3-Q4 2023
+       Effect: Panama-adjacent ports (Colon, Manzanillo), multiplier 1.8
+
+  Source citations for each shock: published IMF/UNCTAD/Maersk reports
+  (all public, all free). Document these in README.
+
+--- WEATHER MODULATION (calibrated to Open-Meteo) ---
+Pull real historical weather from Open-Meteo for each port's coordinates.
+Apply delay modulation based on significant wave height (SWH):
+
+  SWH < 1.5m:  weather_multiplier = 1.0 (no effect)
+  SWH 1.5-2.5m: weather_multiplier = 1.1
+  SWH 2.5-3.5m: weather_multiplier = 1.3
+  SWH > 3.5m:  weather_multiplier = 1.6
+
+  Wind speed > 40 knots: additional multiplier 1.2
+  Source: IMO operational guidelines + published port weather studies
+
+--- VESSEL CALL VOLUME PER PORT ---
+Use real TEU throughput rankings to set call frequency:
+  Major hub (>30M TEU/year): ~8,000 vessel calls/year
+  Secondary hub (10-30M TEU): ~4,000 vessel calls/year
+  Regional port (<10M TEU):  ~1,500 vessel calls/year
+  Scale to 5 years (2020-2024) = ~50,000 total records across 60 ports
+
+--- SYNTHETIC RECORD SCHEMA ---
+Each row represents one vessel call:
+
+  vessel_call_id        string    unique ID (synthetic)
+  port_code             string    UN/LOCODE (real codes)
+  port_name             string
+  port_country          string
+  port_lat              float
+  port_lon              float
+  arrival_date          date      2020-01-01 to 2024-12-31
+  year                  int
+  month                 int
+  quarter               int
+  vessel_type           string    container / bulk / tanker (80% container)
+  vessel_size_teu       int       drawn from realistic distribution per port
+  scheduled_port_hours  float     from CPPI call size methodology
+  actual_port_hours     float     scheduled + delay
+  delay_days            float     actual - scheduled (can be 0)
+  is_delayed            int       1 if delay_days > 0.5, else 0
+  delay_cause           string    weather / congestion / geopolitical / operational
+  cppi_score            float     port's CPPI score for that year (from real data)
+  gpr_index             float     GPR at port country for that month (real data)
+  gpr_category          string    low / medium / high / extreme
+  wave_height_m         float     from Open-Meteo (real data)
+  wind_speed_knots      float     from Open-Meteo (real data)
+  sea_surface_temp_c    float     from Open-Meteo (real data)
+  shock_event           string    none / covid / suez / us_congestion / red_sea / panama
+  shock_multiplier      float     multiplier applied (for transparency)
+  base_delay_mean       float     port's base delay mean (for transparency)
+  lpi_score             float     country LPI score (from real data)
+  lsci_score            float     country LSCI score (from real data)
+  region                string    asia_pacific / europe / middle_east / americas
+
+--- VALIDATION CHECKS ON SYNTHETIC DATA ---
+Before using for ML, verify:
+  1. Mean delay per port matches published CPPI-implied values (±20%)
+  2. Delay spike during COVID period (2021) matches published ~65% schedule reliability
+  3. LA/LB ports show correct congestion pattern Oct 2021 - Mar 2022
+  4. Red Sea ports show correct pattern Dec 2023+
+  5. Overall delay rate ~35-40% (consistent with published industry figures)
+  6. Log-normal shape confirmed with Q-Q plot per port
+
+
+================================================================================
+SECTION 5 — ML ARCHITECTURE
+================================================================================
+
+--- MODEL 1: Binary Delay Classifier (Target A) ---
+Task: Predict is_delayed (0/1) for each vessel call
+Algorithm: XGBoost classifier
+  Why XGBoost: Tabular data, handles mixed types, fast, SHAP-native support
+  Why not neural net: Dataset size ~50k rows, tabular structure, interpretability needed
+  Why not Random Forest: XGBoost consistently outperforms RF at this scale
+
+Features (inputs):
+  - cppi_score (port efficiency — real data)
+  - gpr_index (geopolitical risk — real data)
+  - wave_height_m (weather — real data)
+  - wind_speed_knots (weather — real data)
+  - month, quarter (seasonality)
+  - vessel_size_teu (vessel characteristics)
+  - vessel_type (categorical encoded)
+  - lpi_score (logistics quality — real data)
+  - lsci_score (connectivity — real data)
+  - region (categorical encoded)
+  - rolling_delay_rate_30d (port's delay rate last 30 days — derived feature)
+  - rolling_delay_rate_90d (port's delay rate last 90 days — derived feature)
+  - shock_event (categorical encoded)
+
+Target: is_delayed (binary)
+Expected performance: AUC > 0.82, F1 > 0.75
+Evaluation: Stratified 80/20 split, cross-validation on time axis
+             (train on 2020-2023, test on 2024 — temporal split, not random)
+             IMPORTANT: always use temporal split for time series data
+
+--- MODEL 2: Delay Duration Regressor (Target B) ---
+Task: Predict delay_days (continuous) for delayed vessel calls
+Algorithm: LightGBM regressor
+  Why LightGBM: Faster than XGBoost on larger datasets, better on sparse features,
+  handles 0-inflated target distribution well
+
+Features: Same as Model 1 plus:
+  - predicted_delay_prob from Model 1 (stacking feature)
+  - port_avg_delay_12m (trailing average — derived)
+
+Target: delay_days (continuous, log-transformed for training)
+Expected performance: RMSE < 1.2 days, MAPE < 18%
+Evaluation: Temporal split same as Model 1
+
+--- MODEL 3: Port Risk Score (Target C) ---
+Task: Assign a 0-100 risk score to each port for the next 30 days
+This is NOT a separate ML model — it's a derived score:
+
+  risk_score = weighted combination of:
+    - predicted delay probability for next 30 days (from Model 1): weight 40%
+    - predicted mean delay days for next 30 days (from Model 2): weight 30%
+    - current GPR index (real-time): weight 15%
+    - current wave height anomaly vs seasonal average: weight 10%
+    - recent shock event active flag: weight 5%
+
+  Normalise to 0-100 using min-max scaling across all ports
+  Colour coding: 0-33 = green, 34-66 = amber, 67-100 = red
+
+--- EXPLAINABILITY LAYER ---
+SHAP (SHapley Additive exPlanations) on both XGBoost and LightGBM models:
+  - Global feature importance plots
+  - Per-prediction waterfall charts (shown in dashboard drilldown)
+  - Force plots for top 10 highest-risk vessel calls
+
+This is critical for interviews. "I can explain why the model flagged this port"
+is what separates this from a black-box project.
+
+--- LIBRARIES ---
+  scikit-learn     model evaluation, preprocessing, pipelines
+  xgboost          Model 1
+  lightgbm         Model 2
+  shap             explainability layer
+  pandas           data manipulation
+  numpy            numerical operations
+  scipy            statistical distributions for synthetic generator
+  openmeteo-requests  Open-Meteo API wrapper (pip install openmeteo-requests)
+  requests-cache   cache API calls to avoid re-fetching
+  matplotlib       static plots
+  plotly           interactive charts for dashboard
+
+
+================================================================================
+SECTION 6 — FRONTEND / DASHBOARD DESIGN
+================================================================================
+
+TECHNOLOGY STACK: React + Tailwind CSS + Mapbox GL JS (or Deck.gl)
+NOT Streamlit. This is intentional — Streamlit looks like a student project.
+A React dashboard looks like a product.
+
+DEPLOYMENT: Vercel (free tier, instant deploy from GitHub)
+
+THREE PANELS:
+
+Panel 1 — World Risk Map (landing page)
+  - Full-screen interactive world map (Mapbox GL)
+  - 60 ports shown as circles, sized by TEU volume
+  - Circle colour = current risk score (green/amber/red)
+  - Hover tooltip: port name, risk score, top delay factor
+  - Time slider: scrub through 2020-2024 to see risk evolution
+  - Shock event markers on timeline (COVID, Suez, Red Sea)
+  - This is the hero visual — must be stunning
+
+Panel 2 — Port Drilldown
+  - Click any port on map → opens drilldown panel
+  - Shows: 12-month delay history (bar chart), delay cause breakdown (pie),
+    risk score trend (line chart), SHAP waterfall for latest prediction
+  - Weather widget: current wave height, wind speed at port coordinates
+  - "Similar ports" comparison
+
+Panel 3 — Route Risk Simulator
+  - User selects origin port + destination port
+  - System shows: route on map, intermediate ports, cumulative delay risk,
+    total expected delay days, weather along route
+  - "What-if" mode: adjust GPR or weather to see how risk changes
+  - This is the most impressive panel for interviews
+
+DESIGN PRINCIPLES:
+  - Dark map background (Mapbox dark style)
+  - Clean sans-serif typography
+  - No clutter — every element earns its place
+  - Mobile responsive (Maersk interviewer might check on phone)
+  - Loading states and error boundaries implemented properly
+
+MAPBOX NOTE: Mapbox GL JS requires a free API token (mapbox.com, no CC needed
+for <50,000 map loads/month). Alternative: Deck.gl with no API key required.
+Decide at build time based on which has better free tier.
+
+
+================================================================================
+SECTION 7 — BUILD STAGES (DO IN THIS ORDER)
+================================================================================
+
+RULE: Each stage ends with a verification checkpoint.
+      Do not proceed to next stage until current stage is verified.
+      This was the lesson from the agritech project.
+
+--- STAGE 0: Environment Setup (1 day) ---
+  [x] Create project folder: C:\Users\aryan\port_risk\
+  [x] Set up Python virtual environment
+  [x] Install all Python dependencies (requirements.txt)
+  [ ] Create React app (Vite + Tailwind)
+  [ ] Set up GitHub repo
+  [x] Verify: all imports work, no dependency conflicts
+
+  Folder structure:
+    port_risk/
+    ├── data/
+    │   ├── raw/          (CPPI Excel, GPR CSV — downloaded manually)
+    │   ├── weather/      (Open-Meteo JSON responses, cached)
+    │   └── processed/    (cleaned CSVs ready for generator)
+    ├── generator/        (synthetic data generator scripts)
+    ├── models/           (trained .pkl files, SHAP outputs)
+    ├── notebooks/        (EDA, validation, one-off analysis)
+    ├── dashboard/        (React app)
+    ├── utils/            (helper functions)
+    ├── context/          (this file + session summaries)
+    └── requirements.txt
+
+--- STAGE 1: Real Data Acquisition and Validation (1-2 days) ---
+  [ ] Download CPPI 2020-2024 report + underlying dataset from World Bank
+  [ ] Parse CPPI Excel: extract port_name, port_code, cppi_score per year
+  [ ] Download GPR monthly CSV from matteoiacoviello.com
+  [ ] Parse GPR: confirm columns (year, month, gpr_index, country-level if available)
+  [ ] Test Open-Meteo API for 3 sample ports (Singapore, Rotterdam, LA)
+      Confirm: wave_height, wind_speed, SST available for 2020-2024
+  [ ] Download LPI 2023 from World Bank LPI portal
+  [ ] Download LSCI from UNCTAD
+  [ ] Create port_master.csv: 60 ports with lat, lon, UN/LOCODE, region,
+      CPPI scores (2020-2024), LPI, LSCI
+
+  CHECKPOINT: port_master.csv exists, all 60 ports have valid CPPI scores,
+  Open-Meteo returns data for all 60 port coordinates. Print summary stats.
+
+--- STAGE 2: Synthetic Generator (2-3 days) ---
+  [ ] Build generator/generate_vessel_calls.py
+  [ ] Implement base delay distribution (log-normal, parameterised by CPPI)
+  [ ] Implement GPR shock injection (multipliers as defined in Section 4)
+  [ ] Implement hard-coded shock events (COVID, Suez, Red Sea, etc.)
+  [ ] Implement weather modulation (Open-Meteo real data)
+  [ ] Generate full dataset: ~50,000 rows, 2020-2024, 60 ports
+  [ ] Save to data/processed/vessel_calls_synthetic.csv
+
+  CHECKPOINT (validation checks from Section 4):
+  [ ] Mean delay per port within ±20% of CPPI-implied values
+  [ ] Overall delay rate 35-40%
+  [ ] LA/LB congestion spike visible Oct 2021 - Mar 2022
+  [ ] Red Sea ports show spike Dec 2023+
+  [ ] Log-normal shape confirmed with Q-Q plots
+  [ ] Print: describe(), delay_rate by port, delay_rate by year
+
+  DO NOT PROCEED if validation fails. Fix generator parameters first.
+
+--- STAGE 3: ML Models (2-3 days) ---
+  [ ] EDA notebook: distributions, correlations, target balance check
+  [ ] Feature engineering:
+      - rolling_delay_rate_30d, rolling_delay_rate_90d per port
+      - lag features: previous month's GPR, previous month's delay rate
+      - cyclical encoding for month (sin/cos)
+      - one-hot encoding for region, vessel_type, shock_event
+  [ ] Temporal train/test split: train 2020-2023, test 2024
+  [ ] Model 1: XGBoost classifier — train, tune, evaluate
+      Target metrics: AUC > 0.82, F1 > 0.75
+  [ ] Model 2: LightGBM regressor — train, tune, evaluate (on delayed calls only)
+      Target metrics: RMSE < 1.2d, MAPE < 18%
+  [ ] SHAP analysis: global importance + per-prediction waterfall
+  [ ] Generate risk scores (Target C) for all ports, all dates
+  [ ] Save: models/xgb_classifier.pkl, models/lgbm_regressor.pkl
+  [ ] Save: data/processed/port_risk_scores.csv (port, date, risk_score)
+  [ ] Save: data/processed/shap_values.csv
+
+  CHECKPOINT:
+  [ ] Model 1 AUC > 0.82 on 2024 test set
+  [ ] Model 2 RMSE < 1.2 days on 2024 test set
+  [ ] SHAP plots generated and make intuitive sense
+  [ ] Risk scores range 0-100, distribution is reasonable (not all clustered)
+
+  DO NOT PROCEED to frontend if models underperform. Debug features first.
+
+--- STAGE 4: API Layer (1 day) ---
+  [ ] Build FastAPI backend: api/main.py
+  [ ] Endpoints needed:
+      GET /ports                   → list of all 60 ports with current risk scores
+      GET /ports/{port_code}       → port detail + 12m history + SHAP
+      GET /route/{origin}/{dest}   → route risk analysis
+      GET /risk-scores/{date}      → all port risk scores for a given date
+  [ ] Load models + data at startup (not per-request)
+  [ ] CORS enabled for React frontend
+  [ ] Test all endpoints with curl / Postman
+
+  CHECKPOINT: All 4 endpoints return correct JSON, latency < 500ms
+
+--- STAGE 5: Frontend Dashboard (3-4 days) ---
+  [ ] Set up React app with Vite + Tailwind
+  [ ] Install: mapbox-gl (or deck.gl), recharts, axios
+  [ ] Panel 1: World Risk Map
+      - Mapbox map with port circles (colour = risk, size = TEU volume)
+      - Hover tooltip
+      - Time slider (2020-2024)
+      - Shock event annotations on timeline
+  [ ] Panel 2: Port Drilldown
+      - Triggered by map click
+      - Delay history bar chart (recharts)
+      - SHAP waterfall component
+      - Weather widget
+  [ ] Panel 3: Route Simulator
+      - Origin/destination dropdowns
+      - Route drawn on map
+      - Risk summary card
+  [ ] Polish: dark theme, loading states, responsive layout
+  [ ] Connect to FastAPI backend (axios calls)
+
+  CHECKPOINT: All three panels functional, no console errors, loads on mobile
+
+--- STAGE 6: Deployment and Documentation (1 day) ---
+  [ ] Deploy FastAPI to Render.com (free tier) or Railway.app
+  [ ] Deploy React to Vercel (free tier)
+  [ ] README.md:
+      - Project overview (2 paragraphs)
+      - Data sources section (with full attribution)
+      - Synthetic generator methodology (with citations)
+      - ML architecture and results table
+      - Dashboard screenshots
+      - "Why synthetic data" section (the interview narrative)
+      - How to run locally
+  [ ] Update this context file with final results
+
+  CHECKPOINT: Live URL works, README is interview-ready
+
+
+================================================================================
+SECTION 8 — PORTS MASTER LIST (60 PORTS)
+================================================================================
+
+These are the 60 ports to include. UN/LOCODE + coordinates to be populated
+in Stage 1 from port_master.csv.
+
+ASIA-PACIFIC (20):
+  Shanghai (CNSHA), Singapore (SGSIN), Ningbo-Zhoushan (CNNGB),
+  Shenzhen (CNSZX), Busan (KRPUS), Hong Kong (HKHKG),
+  Guangzhou (CNGZU), Qingdao (CNTAO), Tianjin (CNTXG),
+  Port Klang (MYPKG), Tanjung Pelepas (MYTPP), Jakarta (IDJKT),
+  Kaohsiung (TWKHH), Tokyo (JPTYO), Osaka (JPOSA),
+  Manila (PHMNL), Ho Chi Minh City (VNSGN), Laem Chabang (THLCH),
+  Colombo (LKCMB), Mumbai (INBOM)
+
+EUROPE (15):
+  Rotterdam (NLRTM), Antwerp (BEANR), Hamburg (DEHAM),
+  Felixstowe (GBFXT), Valencia (ESVLC), Algeciras (ESALG),
+  Piraeus (GRPIR), Genoa (ITGOA), Le Havre (FRLEH),
+  Bremerhaven (DEBRV), Gdansk (PLGDN), Gioia Tauro (ITGIT),
+  Barcelona (ESBCN), Marseille (FRMRS), Constanta (ROCND)
+
+MIDDLE EAST / AFRICA (10):
+  Jebel Ali (AEJEA), Port Said (EGPSD), Salalah (OMSLL),
+  Dammam (SADMM), Mombasa (KEMBA), Durban (ZADUR),
+  Tanger Med (MATNG), Aden (YEATH), Bandar Abbas (IRBND),
+  Karachi (PKKHJ)
+
+AMERICAS (15):
+  Los Angeles (USLAX), Long Beach (USLGB), New York (USNYC),
+  Savannah (USSAV), Houston (USHOU), Santos (BRSSZ),
+  Manzanillo MX (MXZLO), Cartagena CO (COCTG), Colon (PAONX),
+  Vancouver (CAVAN), Seattle (USSEA), Baltimore (USBAL),
+  Charleston (USCHS), Norfolk (USNFK), Lazaro Cardenas (MXLZC)
+
+
+================================================================================
+SECTION 9 — KEY DECISIONS LOG
+================================================================================
+
+DATE: June 2026
+DECISION: Moved away from agritech (crop yield prediction Maharashtra)
+REASON: R²=0.46, data.gov.in unreliable, ICRISAT gaps, only 2 crops.
+         Cotton excluded due to wrong feature window. Dataset too small (~150 rows).
+
+DECISION: Supply chain / port delay domain chosen over predictive maintenance
+REASON: Maersk is primary target company. They literally built PortSight for
+        this exact problem. Direct domain alignment. MBA → Operations narrative
+        is stronger with maritime logistics experience.
+
+DECISION: Synthetic data with calibrated generator approved
+REASON: Real port congestion data (Portcast, Kpler, Beacon) costs $500-$1000+/month.
+        Student/academic access not available without lengthy approval process.
+        Principled synthetic generation with documented assumptions is defensible
+        and actually demonstrates stronger DS skills than downloading a ready CSV.
+
+DECISION: React + Mapbox frontend (not Streamlit)
+REASON: Flagship project needs to look like a product. Streamlit signals student
+        project. React signals professional engineering.
+
+DECISION: Temporal train/test split (not random)
+REASON: Time series data. Random split leaks future information into training.
+        Always train on 2020-2023, test on 2024. This is production-correct methodology.
+
+DECISION: SHAP on both models mandatory
+REASON: Maersk, Bosch, ABB all emphasise explainable AI. "Why did the model
+        predict this?" is the first interview question for any production ML role.
+
+
+================================================================================
+SECTION 10 — WHAT TO SAY IN INTERVIEWS
+================================================================================
+
+QUESTION: "Where did your data come from?"
+ANSWER: "Port performance data from the World Bank CPPI (403 ports, 2020-2024,
+CC-licensed), geopolitical risk from the Caldara-Iacoviello GPR Index (Federal
+Reserve working paper, free download), and marine weather from Open-Meteo's
+free API. For per-vessel delay events — which commercial providers charge
+$500+/month for — I built a calibrated synthetic generator. Every assumption
+is documented in the README with citations."
+
+QUESTION: "Isn't synthetic data unreliable?"
+ANSWER: "It depends entirely on how it's generated. Mine is anchored to three
+real datasets and calibrated against published statistics — overall schedule
+reliability of ~65% in 2021, specific congestion patterns at LA/LB in 2021-2022,
+Red Sea disruption from Dec 2023. I ran validation checks to confirm the synthetic
+data reproduces these known patterns. The generator code is open-source, so
+every assumption can be audited."
+
+QUESTION: "What would make this better with more resources?"
+ANSWER: "With access to Kpler or MarineTraffic historical AIS data — which costs
+~$500-1000/month — I could replace the synthetic layer with real vessel-level
+events. I'd also add satellite imagery-based congestion detection, which Maersk
+uses in their Star Connect platform. The architecture is already designed for
+this upgrade — the synthetic data schema exactly mirrors what real AIS data
+would provide."
+
+QUESTION: "Why port delays specifically?"
+ANSWER: "Maersk's PortSight platform solves this commercially. I wanted to
+build something where I could study a real production ML system, understand
+its problem formulation, and build an independent version. It also aligns with
+my long-term goal of moving into operations — understanding how data-driven
+logistics intelligence works from the engineering side first."
+
+QUESTION: "What's the model performance?"
+ANSWER: Quote actual results from Stage 3. Target: AUC > 0.82, RMSE < 1.2 days.
+Do not quote these targets as results — update this file after training.
+
+
+================================================================================
+SECTION 11 — SESSION MANAGEMENT INSTRUCTIONS FOR CLAUDE CODE
+================================================================================
+
+AT THE START OF EVERY CLAUDE CODE SESSION:
+  1. Say: "Read PORT_DELAY_PROJECT_CONTEXT.txt before we begin."
+  2. State which stage you are in
+  3. State what was completed last session (update this file)
+  4. State what you want to accomplish this session
+
+AT THE END OF EVERY CLAUDE CODE SESSION:
+  1. Ask Claude Code to update the "Current Status" below
+  2. Note any decisions made that differ from this document
+  3. Note any blockers or problems discovered
+
+CURRENT STATUS:
+  Stage 0: IN PROGRESS
+  Stage 1: NOT STARTED
+  Stage 2: NOT STARTED
+  Stage 3: NOT STARTED
+  Stage 4: NOT STARTED
+  Stage 5: NOT STARTED
+  Stage 6: NOT STARTED
+
+LAST SESSION SUMMARY: Initial planning in Claude.ai chat (June 2026).
+  All decisions made. Data sources verified. Architecture locked.
+  Stage 0 partially complete: folder structure, venv, Python deps all done.
+  Remaining: React app scaffold, GitHub repo setup.
+
+BLOCKERS: None currently.
+
+MODEL RESULTS (update after Stage 3):
+  Model 1 XGBoost AUC: TBD
+  Model 1 XGBoost F1:  TBD
+  Model 2 LightGBM RMSE: TBD
+  Model 2 LightGBM MAPE: TBD
+
+LIVE URL (update after Stage 6): TBD
+
+
+================================================================================
+END OF CONTEXT FILE
+Version 1.0 | Created June 2026 | Next update: after Stage 1 completion
+================================================================================
