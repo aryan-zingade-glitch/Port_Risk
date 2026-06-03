@@ -4,8 +4,8 @@ A production-grade port delay prediction system built as a flagship data science
 Predicts vessel call delays at 60 major container ports worldwide using public data and a calibrated
 synthetic generator — mirroring the problem Maersk's PortSight platform solves commercially.
 
-**Live demo:** _[Vercel URL — add after deployment]_  
-**API docs:** _[Render URL — add after deployment]_`/docs`
+**Live dashboard:** https://nautiq-fawn.vercel.app  
+**API docs:** https://nautiq-api.onrender.com/docs
 
 ---
 

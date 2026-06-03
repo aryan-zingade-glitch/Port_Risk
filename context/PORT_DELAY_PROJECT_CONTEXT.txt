@@ -681,7 +681,7 @@ CURRENT STATUS:
   Stage 3: COMPLETE
   Stage 4: COMPLETE
   Stage 5: COMPLETE
-  Stage 6: IN PROGRESS
+  Stage 6: COMPLETE
 
 LAST SESSION SUMMARY: Stage 0 + Stage 1 completed (June 3, 2026).
   Stage 0: folder structure, venv, Python deps, React+Vite+Tailwind scaffold, GitHub repo.
@@ -709,7 +709,9 @@ MODEL RESULTS (updated after Stage 3):
   (1.57d) is the better metric for typical prediction accuracy.
   In production with real AIS density data and news sentiment, AUC 0.82+ is achievable.
 
-LIVE URL (update after Stage 6): TBD
+LIVE URL (update after Stage 6):
+  Dashboard: https://nautiq-fawn.vercel.app
+  API:       https://nautiq-api.onrender.com/docs
 
 
 ================================================================================
