@@ -1,0 +1,9 @@
+{
+  "xgb_auc": 0.6786,
+  "xgb_f1": 0.5387,
+  "lgbm_rmse": 6.8237,
+  "lgbm_mape": 81.59,
+  "n_features": 24,
+  "train_records": 40920,
+  "test_records": 10230
+}
