@@ -6,10 +6,12 @@ __pycache__/
 *.egg-info/
 .env
 
-# Data files (large — add manually if needed)
+# Data files — raw and weather are large downloads, exclude from git
 data/raw/
 data/weather/
-data/processed/
+
+# Processed CSVs are committed (small, reproducible outputs)
+# data/processed/ is NOT excluded
 
 # Models
 models/*.pkl

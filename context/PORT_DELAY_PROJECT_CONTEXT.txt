@@ -675,18 +675,21 @@ AT THE END OF EVERY CLAUDE CODE SESSION:
   3. Note any blockers or problems discovered
 
 CURRENT STATUS:
-  Stage 0: IN PROGRESS
-  Stage 1: NOT STARTED
+  Stage 0: COMPLETE
+  Stage 1: COMPLETE
   Stage 2: NOT STARTED
   Stage 3: NOT STARTED
   Stage 4: NOT STARTED
   Stage 5: NOT STARTED
   Stage 6: NOT STARTED
 
-LAST SESSION SUMMARY: Initial planning in Claude.ai chat (June 2026).
-  All decisions made. Data sources verified. Architecture locked.
-  Stage 0 partially complete: folder structure, venv, Python deps all done.
-  Remaining: React app scaffold, GitHub repo setup.
+LAST SESSION SUMMARY: Stage 0 + Stage 1 completed (June 3, 2026).
+  Stage 0: folder structure, venv, Python deps, React+Vite+Tailwind scaffold, GitHub repo.
+  Stage 1: Downloaded CPPI annex (60/60 ports matched), GPR updated file through May 2026,
+    LPI via World Bank API (60/60 ports), LSCI hardcoded from UNCTAD 2023 Q1 published values.
+    Open-Meteo validated 60/60 ports. port_master.csv and gpr_monthly.csv written.
+  Key files: data/processed/port_master.csv, data/processed/gpr_monthly.csv
+  Key raw data: data/raw/cppi_annex_v2.xlsx, data/raw/gpr_updated.xls, data/raw/lpi_2018.json
 
 BLOCKERS: None currently.
 
