@@ -19,7 +19,7 @@ export default function App() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-sm">⚓</div>
-            <span className="font-bold text-white tracking-tight">PortRisk</span>
+            <span className="font-bold text-white tracking-tight">NautIQ</span>
           </div>
           <span className="text-gray-600 text-xs hidden sm:block">Global Port Delay Intelligence</span>
         </div>

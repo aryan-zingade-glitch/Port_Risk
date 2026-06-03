@@ -27,8 +27,8 @@ PROCESSED = ROOT / "data/processed"
 MODELS    = ROOT / "models"
 
 app = FastAPI(
-    title="PortRisk API",
-    description="Global port delay intelligence — PortRisk",
+    title="NautIQ API",
+    description="Global port delay intelligence — NautIQ",
     version="1.0.0",
 )
 
