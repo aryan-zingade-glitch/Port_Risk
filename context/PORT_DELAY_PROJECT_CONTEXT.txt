@@ -681,7 +681,7 @@ CURRENT STATUS:
   Stage 3: COMPLETE
   Stage 4: COMPLETE
   Stage 5: COMPLETE
-  Stage 6: NOT STARTED
+  Stage 6: IN PROGRESS
 
 LAST SESSION SUMMARY: Stage 0 + Stage 1 completed (June 3, 2026).
   Stage 0: folder structure, venv, Python deps, React+Vite+Tailwind scaffold, GitHub repo.

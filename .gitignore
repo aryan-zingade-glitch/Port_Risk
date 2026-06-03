@@ -13,8 +13,8 @@ data/weather/
 # Processed CSVs are committed (small, reproducible outputs)
 # data/processed/ is NOT excluded
 
-# Models
-models/*.pkl
+# Models — committed so Render can serve them without re-training
+# models/*.pkl
 
 # Jupyter
 .ipynb_checkpoints/

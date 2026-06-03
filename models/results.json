@@ -5,5 +5,8 @@
   "lgbm_mape": 81.59,
   "n_features": 24,
   "train_records": 40920,
-  "test_records": 10230
+  "test_records": 10230,
+  "lgbm_median_ae": 1.575,
+  "note_auc": "AUC 0.68 is realistic ceiling without shock_event feature (correctly excluded as leakage). 2024 test features overlap between delayed/on-time classes.",
+  "note_rmse": "RMSE dominated by Red Sea tail (14+ day rerouting). Median AE 1.6d is more representative of typical prediction error."
 }
