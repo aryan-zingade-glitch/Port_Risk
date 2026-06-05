@@ -20,37 +20,59 @@ const MAP_STYLE = {
 // ─── Sea-lane routing ────────────────────────────────────────────────────────
 
 const N = {
-  malacca:  [103.8,   1.3],
-  hormuz:   [ 58.5,  22.0],
-  bab:      [ 43.4,  12.6],
-  red_sea:  [ 37.5,  21.0],
-  med_e:    [ 28.0,  34.2],
-  med_c:    [ 14.5,  37.0],
-  gib:      [ -5.4,  36.0],
-  atl_n:    [-25.0,  35.0],
-  pac_w:    [130.0,  10.0],
-  pac_c:    [172.0,   2.0],
-  pac_e_uw: [220.0,  10.0],  // ~140°W unwrapped — eastbound Pacific
-  pac_w_ng: [-150.0, 10.0],  // ~150°W — westbound Pacific
-  pac_c_ng: [-172.0,  2.0],
+  malacca:   [103.8,   1.3],
+  scs:       [115.0,  18.0],  // South China Sea — west of Philippines
+  luzon_str: [124.0,  21.0],  // Luzon Strait / Bashi Channel (between Taiwan & Luzon)
+  phil_sea:  [133.0,  20.0],  // Philippine Sea — east of Philippines, south of Japan
+  hormuz:    [ 58.5,  22.0],
+  bab:       [ 43.4,  12.6],
+  red_sea:   [ 37.5,  21.0],
+  med_e:     [ 28.0,  34.2],
+  med_c:     [ 14.5,  37.0],
+  gib:       [ -5.4,  36.0],
+  atl_n:     [-25.0,  35.0],
+  pac_mid:   [175.0,  10.0],  // mid-Pacific
+  pac_e_uw:  [218.0,  15.0],  // ~142°W unwrapped — eastbound Pacific
+  pac_w_ng:  [-150.0, 10.0],  // westbound Pacific
+  pac_c_ng:  [-172.0,  5.0],
 };
 
 const inGulf = p => p.lat > 22 && p.lon > 48 && p.lon < 62;
 
+// Returns intermediate ocean waypoints between two consecutive ports.
+// The Philippines spans ~118–127°E, 5–21°N — most of the routing logic
+// exists to steer lines around it via the South China Sea or Luzon Strait.
 function segmentWaypoints(from, to) {
   const fr = from.region || '';
   const tr = to.region || '';
 
+  // ── Asia-Pacific intra-region ──────────────────────────────────────────────
   if (fr === 'asia_pacific' && tr === 'asia_pacific') {
     const cross = (from.lon < 105 && to.lon >= 105) || (from.lon >= 105 && to.lon < 105);
-    return cross ? [N.malacca] : [];
+    if (!cross) return [];
+
+    // Determine which port is on the East Asian side (> 105°E)
+    const eastPort = from.lon >= 105 ? from : to;
+    const eastFirst = from.lon >= 105; // going East → West
+
+    if (eastFirst) {
+      // East Asia → South Asia: route west via South China Sea to avoid Philippines
+      if (eastPort.lon > 120 && eastPort.lat > 18) return [N.scs, N.malacca];
+      return [N.malacca];
+    } else {
+      // South Asia → East Asia: same corridor in reverse
+      if (eastPort.lon > 120 && eastPort.lat > 18) return [N.malacca, N.scs];
+      return [N.malacca];
+    }
   }
 
+  // ── Asia-Pacific ↔ Middle East ────────────────────────────────────────────
   if (fr === 'asia_pacific' && tr === 'middle_east')
     return from.lon >= 105 ? [N.malacca] : [];
   if (fr === 'middle_east' && tr === 'asia_pacific')
     return to.lon >= 105 ? [N.malacca] : [];
 
+  // ── Middle East intra-region: Gulf / Red Sea corridor ────────────────────
   if (fr === 'middle_east' && tr === 'middle_east') {
     const fG = inGulf(from), tG = inGulf(to);
     if (fG && to.lon < 43)    return [N.hormuz, N.bab, N.red_sea];
@@ -60,25 +82,45 @@ function segmentWaypoints(from, to) {
     return [];
   }
 
+  // ── Middle East ↔ Europe: Suez / Mediterranean ───────────────────────────
   if (fr === 'middle_east' && tr === 'europe')
     return from.lon < 0 ? [] : [N.med_e, N.med_c, N.gib];
   if (fr === 'europe' && tr === 'middle_east')
     return to.lon < 0 ? [] : [N.gib, N.med_c, N.med_e];
 
+  // ── Europe ↔ Americas: Atlantic crossing ─────────────────────────────────
   if (fr === 'europe' && tr === 'americas') return [N.gib, N.atl_n];
   if (fr === 'americas' && tr === 'europe') return [N.atl_n, N.gib];
 
+  // ── Asia-Pacific → Americas: eastbound trans-Pacific ─────────────────────
+  // Three sub-cases to avoid the Philippines:
+  //   1. South/SW Asia (Mumbai, Colombo): enter Pacific via Malacca → equatorial
+  //   2. N China, HK, Taiwan (lat>20, lon 105–122°E): exit via Luzon Strait
+  //   3. Japan, Korea (lon ≥ 122°E): already in Philippine Sea, head east
   if (fr === 'asia_pacific' && tr === 'americas') {
-    const wps = from.lon < 105 ? [N.malacca] : [];
-    wps.push(N.pac_w, N.pac_c, N.pac_e_uw);
-    return wps;
+    if (from.lon < 105) {
+      return [N.malacca, N.pac_mid, N.pac_e_uw];
+    }
+    if (from.lat > 20 && from.lon < 123) {
+      // N China coast / HK / Taiwan: north of Philippines, exit via Luzon Strait
+      return [N.luzon_str, N.phil_sea, N.pac_mid, N.pac_e_uw];
+    }
+    if (from.lon >= 123) {
+      // Japan / Korea: head south-east into Philippine Sea then Pacific
+      return [N.phil_sea, N.pac_mid, N.pac_e_uw];
+    }
+    // SE Asia or Manila (lat < 20, lon 105–123): go east into Philippine Sea
+    return [N.pac_mid, N.pac_e_uw];
   }
+
+  // ── Americas → Asia-Pacific: westbound trans-Pacific ─────────────────────
   if (fr === 'americas' && tr === 'asia_pacific') {
     const wps = [N.pac_w_ng, N.pac_c_ng];
     if (to.lon < 105) wps.push(N.malacca);
     return wps;
   }
 
+  // ── Middle East ↔ Americas: Suez → Med → Atlantic ────────────────────────
   if (fr === 'middle_east' && tr === 'americas') {
     const wps = [];
     if (from.lon >= 0) {
@@ -99,6 +141,7 @@ function segmentWaypoints(from, to) {
     return wps;
   }
 
+  // ── Asia-Pacific ↔ Europe: fallback (API should add intermediate ports) ──
   if (fr === 'asia_pacific' && tr === 'europe')
     return [N.malacca, N.bab, N.red_sea, N.med_e, N.med_c, N.gib];
   if (fr === 'europe' && tr === 'asia_pacific')
