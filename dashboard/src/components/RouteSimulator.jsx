@@ -17,6 +17,121 @@ const MAP_STYLE = {
   layers: [{ id: 'carto-layer', type: 'raster', source: 'carto' }],
 };
 
+// ─── Sea-lane routing ────────────────────────────────────────────────────────
+
+const N = {
+  malacca:  [103.8,   1.3],
+  hormuz:   [ 58.5,  22.0],
+  bab:      [ 43.4,  12.6],
+  red_sea:  [ 37.5,  21.0],
+  med_e:    [ 28.0,  34.2],
+  med_c:    [ 14.5,  37.0],
+  gib:      [ -5.4,  36.0],
+  atl_n:    [-25.0,  35.0],
+  pac_w:    [130.0,  10.0],
+  pac_c:    [172.0,   2.0],
+  pac_e_uw: [220.0,  10.0],  // ~140°W unwrapped — eastbound Pacific
+  pac_w_ng: [-150.0, 10.0],  // ~150°W — westbound Pacific
+  pac_c_ng: [-172.0,  2.0],
+};
+
+const inGulf = p => p.lat > 22 && p.lon > 48 && p.lon < 62;
+
+function segmentWaypoints(from, to) {
+  const fr = from.region || '';
+  const tr = to.region || '';
+
+  if (fr === 'asia_pacific' && tr === 'asia_pacific') {
+    const cross = (from.lon < 105 && to.lon >= 105) || (from.lon >= 105 && to.lon < 105);
+    return cross ? [N.malacca] : [];
+  }
+
+  if (fr === 'asia_pacific' && tr === 'middle_east')
+    return from.lon >= 105 ? [N.malacca] : [];
+  if (fr === 'middle_east' && tr === 'asia_pacific')
+    return to.lon >= 105 ? [N.malacca] : [];
+
+  if (fr === 'middle_east' && tr === 'middle_east') {
+    const fG = inGulf(from), tG = inGulf(to);
+    if (fG && to.lon < 43)    return [N.hormuz, N.bab, N.red_sea];
+    if (tG && from.lon < 43)  return [N.red_sea, N.bab, N.hormuz];
+    if (from.lon > 43 && to.lon < 43) return [N.bab, N.red_sea];
+    if (from.lon < 43 && to.lon > 43) return [N.red_sea, N.bab];
+    return [];
+  }
+
+  if (fr === 'middle_east' && tr === 'europe')
+    return from.lon < 0 ? [] : [N.med_e, N.med_c, N.gib];
+  if (fr === 'europe' && tr === 'middle_east')
+    return to.lon < 0 ? [] : [N.gib, N.med_c, N.med_e];
+
+  if (fr === 'europe' && tr === 'americas') return [N.gib, N.atl_n];
+  if (fr === 'americas' && tr === 'europe') return [N.atl_n, N.gib];
+
+  if (fr === 'asia_pacific' && tr === 'americas') {
+    const wps = from.lon < 105 ? [N.malacca] : [];
+    wps.push(N.pac_w, N.pac_c, N.pac_e_uw);
+    return wps;
+  }
+  if (fr === 'americas' && tr === 'asia_pacific') {
+    const wps = [N.pac_w_ng, N.pac_c_ng];
+    if (to.lon < 105) wps.push(N.malacca);
+    return wps;
+  }
+
+  if (fr === 'middle_east' && tr === 'americas') {
+    const wps = [];
+    if (from.lon >= 0) {
+      if (inGulf(from)) wps.push(N.hormuz, N.bab, N.red_sea);
+      else if (from.lon > 43) wps.push(N.bab, N.red_sea);
+      wps.push(N.med_e, N.med_c, N.gib);
+    }
+    wps.push(N.atl_n);
+    return wps;
+  }
+  if (fr === 'americas' && tr === 'middle_east') {
+    const wps = [N.atl_n];
+    if (to.lon >= 0) {
+      wps.push(N.gib, N.med_c, N.med_e);
+      if (to.lon > 43) wps.push(N.red_sea, N.bab);
+      if (inGulf(to)) wps.push(N.hormuz);
+    }
+    return wps;
+  }
+
+  if (fr === 'asia_pacific' && tr === 'europe')
+    return [N.malacca, N.bab, N.red_sea, N.med_e, N.med_c, N.gib];
+  if (fr === 'europe' && tr === 'asia_pacific')
+    return [N.gib, N.med_c, N.med_e, N.red_sea, N.bab, N.malacca];
+
+  return [];
+}
+
+function buildSeaRouteLine(allPorts, portMap) {
+  const ps = allPorts.map(lc => portMap[lc]).filter(Boolean);
+  if (ps.length < 2) return ps.map(p => [p.lon, p.lat]);
+
+  // Eastbound trans-Pacific: unwrap western hemisphere lons to >180 so MapLibre
+  // draws the line going east across the Pacific instead of westward through Africa.
+  const transPacE = (ps[0].region === 'asia_pacific') && (ps[ps.length - 1].region === 'americas');
+  const wLon = lon => (transPacE && lon < 0) ? lon + 360 : lon;
+
+  const coords = [[wLon(ps[0].lon), ps[0].lat]];
+  for (let i = 0; i < ps.length - 1; i++) {
+    segmentWaypoints(ps[i], ps[i + 1]).forEach(([lo, la]) => coords.push([wLon(lo), la]));
+    coords.push([wLon(ps[i + 1].lon), ps[i + 1].lat]);
+  }
+  return coords;
+}
+
+function formatETA(baseVoyageDays, expectedDelayDays) {
+  const totalDays = Math.round((baseVoyageDays || 0) + (expectedDelayDays || 0));
+  const eta = new Date(Date.now() + totalDays * 86_400_000);
+  return eta.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function RouteSimulator() {
   const [ports,    setPorts]   = useState([]);
   const [origin,   setOrigin]  = useState('SGSIN');
@@ -43,17 +158,14 @@ export default function RouteSimulator() {
       .catch(() => { setError('Route simulation failed'); setLoading(false); });
   };
 
-  // Build GeoJSON line from route ports
+  // Build GeoJSON line following actual ocean lanes (no straight displacement)
   const routeGeoJSON = result ? {
     type: 'FeatureCollection',
     features: [{
       type: 'Feature',
       geometry: {
         type: 'LineString',
-        coordinates: result.all_ports
-          .map(lc => portMap[lc])
-          .filter(Boolean)
-          .map(p => [p.lon, p.lat]),
+        coordinates: buildSeaRouteLine(result.all_ports, portMap),
       },
       properties: {},
     }],
@@ -122,11 +234,13 @@ export default function RouteSimulator() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 {[
                   ['Total delay risk', `${(result.cumulative_delay_prob * 100).toFixed(1)}%`],
-                  ['Expected delay', `${result.expected_total_delay_days?.toFixed(1)}d`],
-                  ['Waypoints', result.waypoints.length],
-                  ['Ports touched', result.all_ports.length],
+                  ['Expected delay',   `${result.expected_total_delay_days?.toFixed(1)}d`],
+                  ['Voyage time',      `${result.base_voyage_days?.toFixed(1)}d`],
+                  ['ETA (with delay)', formatETA(result.base_voyage_days, result.expected_total_delay_days)],
+                  ['Waypoints',        result.waypoints.length],
+                  ['Ports touched',    result.all_ports.length],
                 ].map(([k, v]) => (
-                  <div key={k} className="bg-gray-750 bg-gray-900/50 rounded-lg p-2">
+                  <div key={k} className="bg-gray-900/50 rounded-lg p-2">
                     <div className="text-gray-500">{k}</div>
                     <div className="text-white font-semibold mt-0.5">{v}</div>
                   </div>

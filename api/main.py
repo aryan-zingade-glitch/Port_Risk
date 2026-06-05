@@ -19,6 +19,7 @@ import pandas as pd
 import numpy as np
 import joblib
 import json
+import math
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -76,6 +77,39 @@ def load_data():
 # ---------------------------------------------------------------------------
 # HELPERS
 # ---------------------------------------------------------------------------
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(min(a, 1.0)))
+
+
+def _base_voyage_days(all_ports: list, pm: pd.DataFrame, waypoints: list) -> float:
+    """Estimate base transit time in days: haversine sum × routing factor ÷ ship speed."""
+    SPEED_KM_DAY = 700       # ~15 knots typical container ship
+    ROUTING_FACTOR = 1.25    # sea lanes are ~25% longer than great-circle
+
+    total_km = 0.0
+    for i in range(len(all_ports) - 1):
+        try:
+            p1 = pm.loc[all_ports[i]]
+            p2 = pm.loc[all_ports[i + 1]]
+            total_km += _haversine_km(float(p1.lat), float(p1.lon), float(p2.lat), float(p2.lon))
+        except KeyError:
+            pass
+
+    total_km *= ROUTING_FACTOR
+
+    canal_days = 0.0
+    if "EGPSD" in waypoints:
+        canal_days += 1.5   # Suez Canal transit + queue
+    if "PAONX" in waypoints:
+        canal_days += 1.0   # Panama Canal transit
+
+    return round(total_km / SPEED_KM_DAY + canal_days, 1)
+
 
 def _port_row(port_code: str) -> pd.Series:
     pm = _data["port_master"]
@@ -219,6 +253,7 @@ class RouteRisk(BaseModel):
     route_risk_label: str
     cumulative_delay_prob: float
     expected_total_delay_days: float
+    base_voyage_days: float
 
 
 # ---------------------------------------------------------------------------
@@ -449,6 +484,8 @@ def get_route_risk(origin: str, dest: str):
 
     route_label = "green" if max_risk_score < 34 else ("amber" if max_risk_score < 67 else "red")
 
+    voyage_days = _base_voyage_days(all_ports, pm, waypoints)
+
     return RouteRisk(
         origin             = origin,
         origin_name        = str(o_port.port_name),
@@ -460,6 +497,7 @@ def get_route_risk(origin: str, dest: str):
         segments           = segments,
         route_risk_score   = round(float(max_risk_score), 1),
         route_risk_label   = route_label,
-        cumulative_delay_prob    = round(float(cumulative_delay_prob), 4),
+        cumulative_delay_prob     = round(float(cumulative_delay_prob), 4),
         expected_total_delay_days = round(float(expected_total_delay), 2),
+        base_voyage_days          = voyage_days,
     )
