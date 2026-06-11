@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { Warning, Lightning } from '@phosphor-icons/react';
 import { getPorts, getRiskScores } from '../api';
-import { scoreToColor, scoreToLabel, tierToRadius } from '../utils/colors';
+import { scoreToColor, tierToRadius } from '../utils/colors';
 import RiskBadge from './RiskBadge';
 
 const MAP_STYLE = {
@@ -72,20 +73,23 @@ export default function WorldRiskMap({ onPortSelect }) {
   }, [riskMap, ports]);
 
   if (error) return (
-    <div className="flex-1 flex items-center justify-center bg-gray-950">
-      <div className="text-center">
-        <div className="text-red-400 text-lg mb-2">API Unavailable</div>
-        <div className="text-gray-500 text-sm">{error}</div>
-        <div className="text-gray-600 text-xs mt-2">Start: uvicorn api.main:app --port 8000</div>
+    <div className="flex-1 flex items-center justify-center bg-abyss">
+      <div className="text-center max-w-xs">
+        <Warning size={28} className="text-risk-high mx-auto mb-3" />
+        <div className="text-ink text-[15px] font-semibold mb-1">API unavailable</div>
+        <div className="text-ink-mute text-[13px]">{error}</div>
+        <div className="text-ink-dim text-[11px] font-mono mt-3 bg-hull border hairline rounded-md px-3 py-2">
+          uvicorn api.main:app --port 8000
+        </div>
       </div>
     </div>
   );
 
   if (loading) return (
-    <div className="flex-1 flex items-center justify-center bg-gray-950">
+    <div className="flex-1 flex items-center justify-center bg-abyss">
       <div className="text-center">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <div className="text-gray-400 text-sm">Loading port data…</div>
+        <div className="radar mx-auto mb-4" role="status" aria-label="Loading port data" />
+        <div className="text-ink-mute text-[13px]">Scanning port network…</div>
       </div>
     </div>
   );
@@ -115,14 +119,14 @@ export default function WorldRiskMap({ onPortSelect }) {
                 onClick={e => { e.originalEvent.stopPropagation(); onPortSelect(port.locode); }}
               >
                 <div
-                  className="cursor-pointer transition-transform hover:scale-125"
+                  className="cursor-pointer transition-transform duration-150 ease-out hover:scale-125"
                   onMouseEnter={() => setTooltip({ ...port, risk })}
                   onMouseLeave={() => setTooltip(null)}
                 >
                   <svg width={r * 2 + 4} height={r * 2 + 4}>
                     <circle
                       cx={r + 2} cy={r + 2} r={r}
-                      fill={color} fillOpacity={0.75}
+                      fill={color} fillOpacity={0.7}
                       stroke={color} strokeWidth={1.5}
                     />
                   </svg>
@@ -134,51 +138,54 @@ export default function WorldRiskMap({ onPortSelect }) {
 
         {/* Tooltip */}
         {tooltip && (
-          <div className="absolute top-4 left-4 bg-gray-900/95 border border-gray-700 rounded-lg p-3 pointer-events-none z-10 min-w-[180px]">
-            <div className="text-white font-semibold text-sm">{tooltip.port_name}</div>
-            <div className="text-gray-400 text-xs mb-2">{tooltip.country} · {tooltip.locode}</div>
-            <div className="flex items-center justify-between">
+          <div className="overlay-enter absolute top-4 left-4 bg-hull/95 backdrop-blur-sm border hairline rounded-lg p-3 pointer-events-none z-10 min-w-[190px] shadow-lg shadow-black/30">
+            <div className="text-ink font-semibold text-[13px]">{tooltip.port_name}</div>
+            <div className="text-ink-mute text-[11px] font-mono mb-2">{tooltip.country} · {tooltip.locode}</div>
+            <div className="flex items-center justify-between gap-3">
               <RiskBadge label={tooltip.risk?.risk_label || 'green'} score={tooltip.risk?.risk_score} />
-              <span className="text-gray-400 text-xs">P(delay) {((tooltip.risk?.delay_prob || 0) * 100).toFixed(0)}%</span>
+              <span className="text-ink-mute text-[11px] font-mono">P(delay) {((tooltip.risk?.delay_prob || 0) * 100).toFixed(0)}%</span>
             </div>
           </div>
         )}
 
         {/* Legend */}
-        <div className="absolute bottom-20 right-4 bg-gray-900/90 border border-gray-700 rounded-lg p-3 text-xs">
-          <div className="text-gray-400 mb-2 font-medium">Risk Level</div>
+        <div className="absolute bottom-24 right-4 bg-hull/90 backdrop-blur-sm border hairline rounded-lg px-3 py-2.5 text-[11px]">
+          <div className="text-ink-dim uppercase tracking-wider text-[10px] font-semibold mb-2">Risk level</div>
           {[['green','Low'],['amber','Medium'],['red','High']].map(([c,l]) => (
-            <div key={c} className="flex items-center gap-2 mb-1">
-              <div className="w-3 h-3 rounded-full" style={{ background: scoreToColor(c === 'green' ? 10 : c === 'amber' ? 50 : 80) }} />
-              <span className="text-gray-300">{l}</span>
+            <div key={c} className="flex items-center gap-2 mb-1.5 last:mb-0">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: scoreToColor(c === 'green' ? 10 : c === 'amber' ? 50 : 80) }} />
+              <span className="text-ink-mute">{l}</span>
             </div>
           ))}
-          <div className="border-t border-gray-700 mt-2 pt-2 text-gray-500">
+          <div className="border-t hairline mt-2 pt-2 text-ink-dim">
             Circle size = TEU volume
           </div>
         </div>
       </div>
 
-      {/* Timeline slider */}
-      <div className="bg-gray-900 border-t border-gray-800 px-6 py-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-gray-300 font-mono text-sm font-semibold">{curMonth.label}</span>
+      {/* Timeline */}
+      <div className="bg-hull border-t hairline px-6 py-4 shrink-0">
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-ink font-mono text-[15px] font-semibold tabular-nums">{curMonth.label}</span>
           {shock && (
-            <span className="text-amber-400 text-xs bg-amber-900/30 border border-amber-800 px-2 py-0.5 rounded-full animate-pulse">
-              ⚡ {shock.label}
+            <span className="overlay-enter flex items-center gap-1.5 text-risk-mid text-[11px] font-medium bg-risk-mid/10 border border-risk-mid/30 px-2.5 py-1 rounded-md">
+              <Lightning size={12} weight="fill" />
+              {shock.label}
             </span>
           )}
-          <span className="text-gray-500 text-xs">{ports.length} ports tracked</span>
+          <span className="text-ink-dim text-[11px] font-mono">{ports.length} ports tracked</span>
         </div>
         <input
           type="range"
+          className="timeline"
           min={0}
           max={ALL_MONTHS.length - 1}
           value={sliderIdx}
           onChange={e => setSliderIdx(Number(e.target.value))}
-          className="w-full h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer accent-blue-500"
+          aria-label="Month"
+          aria-valuetext={curMonth.label}
         />
-        <div className="flex justify-between text-gray-600 text-xs mt-1.5">
+        <div className="flex justify-between text-ink-dim text-[11px] font-mono mt-1.5">
           <span>2020</span><span>2021</span><span>2022</span><span>2023</span><span>2024</span>
         </div>
 
@@ -190,11 +197,11 @@ export default function WorldRiskMap({ onPortSelect }) {
             return (
               <div
                 key={`${e.year}-${e.month}`}
-                className="absolute transform -translate-x-1/2"
+                className="absolute -translate-x-1/2"
                 style={{ left: `${pct}%` }}
                 title={e.label}
               >
-                <div className="w-0.5 h-2 bg-amber-500/60" />
+                <div className="w-px h-2.5 bg-risk-mid/70" />
               </div>
             );
           })}

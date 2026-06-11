@@ -1,7 +1,7 @@
 export const RISK_COLORS = {
-  green: '#22c55e',
-  amber: '#f59e0b',
-  red:   '#ef4444',
+  green: '#2fbf71',
+  amber: '#e8a13c',
+  red:   '#e25555',
 };
 
 export function scoreToLabel(score) {

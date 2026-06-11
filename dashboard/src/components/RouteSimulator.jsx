@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import Map, { Marker, Source, Layer, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { Compass, ArrowDown } from '@phosphor-icons/react';
 import { getPorts, getRoute } from '../api';
-import { scoreToColor, labelToColor, RISK_COLORS } from '../utils/colors';
+import { labelToColor } from '../utils/colors';
 import RiskBadge from './RiskBadge';
 
 const MAP_STYLE = {
@@ -175,6 +176,14 @@ function formatETA(baseVoyageDays, expectedDelayDays) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+function FieldLabel({ children, htmlFor }) {
+  return (
+    <label htmlFor={htmlFor} className="block text-ink-dim text-[10px] font-semibold uppercase tracking-[0.08em] mb-1.5">
+      {children}
+    </label>
+  );
+}
+
 export default function RouteSimulator() {
   const [ports,    setPorts]   = useState([]);
   const [origin,   setOrigin]  = useState('SGSIN');
@@ -219,20 +228,20 @@ export default function RouteSimulator() {
   return (
     <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
       {/* Left: controls + results */}
-      <div className="w-full md:w-80 bg-gray-900 border-r border-gray-800 flex flex-col overflow-y-auto">
-        <div className="px-5 py-5 border-b border-gray-800">
-          <h2 className="text-white font-semibold mb-1">Route Risk Simulator</h2>
-          <p className="text-gray-500 text-xs">Analyse cumulative delay risk along a shipping route</p>
+      <div className="w-full md:w-80 bg-hull border-r hairline flex flex-col overflow-y-auto shrink-0">
+        <div className="px-5 py-5 border-b hairline">
+          <h2 className="text-ink font-semibold text-[15px] mb-1">Route Risk Simulator</h2>
+          <p className="text-ink-mute text-[12px]">Cumulative delay risk along a shipping route</p>
         </div>
 
-        <div className="px-5 py-4 space-y-4 border-b border-gray-800">
-          {/* Origin */}
+        <div className="px-5 py-4 space-y-4 border-b hairline">
           <div>
-            <label className="block text-gray-400 text-xs mb-1.5 uppercase tracking-wide">Origin Port</label>
+            <FieldLabel htmlFor="origin-select">Origin port</FieldLabel>
             <select
+              id="origin-select"
+              className="field"
               value={origin}
               onChange={e => setOrigin(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
             >
               {sortedPorts.map(p => (
                 <option key={p.locode} value={p.locode}>{p.port_name} ({p.locode})</option>
@@ -240,13 +249,17 @@ export default function RouteSimulator() {
             </select>
           </div>
 
-          {/* Destination */}
+          <div className="flex justify-center -my-2">
+            <ArrowDown size={13} className="text-ink-dim" />
+          </div>
+
           <div>
-            <label className="block text-gray-400 text-xs mb-1.5 uppercase tracking-wide">Destination Port</label>
+            <FieldLabel htmlFor="dest-select">Destination port</FieldLabel>
             <select
+              id="dest-select"
+              className="field"
               value={dest}
               onChange={e => setDest(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
             >
               {sortedPorts.map(p => (
                 <option key={p.locode} value={p.locode}>{p.port_name} ({p.locode})</option>
@@ -257,24 +270,34 @@ export default function RouteSimulator() {
           <button
             onClick={simulate}
             disabled={loading || !origin || !dest || origin === dest}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
+            className="pressable w-full bg-signal-deep hover:bg-signal text-abyss font-semibold py-2.5 rounded-lg text-[13px]
+                       disabled:bg-hull-2 disabled:text-ink-dim disabled:cursor-not-allowed"
           >
-            {loading ? 'Simulating…' : 'Simulate Route'}
+            {loading ? 'Simulating…' : 'Simulate route'}
           </button>
 
-          {error && <p className="text-red-400 text-xs">{error}</p>}
+          {error && <p className="text-risk-high text-[12px]">{error}</p>}
         </div>
 
         {/* Results */}
-        {result && (
-          <div className="px-5 py-4 space-y-4">
+        {loading && (
+          <div className="px-5 py-4 space-y-3" role="status" aria-label="Simulating route">
+            <div className="skeleton h-[140px]" />
+            <div className="skeleton h-5 w-2/3" />
+            <div className="skeleton h-12" />
+            <div className="skeleton h-12" />
+          </div>
+        )}
+
+        {result && !loading && (
+          <div className="panel-enter px-5 py-4 space-y-5">
             {/* Summary */}
-            <div className="bg-gray-800 rounded-xl p-4">
+            <div className="bg-hull-2 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-gray-300 text-sm font-semibold">Route Summary</span>
+                <span className="text-ink text-[13px] font-semibold">Route summary</span>
                 <RiskBadge label={result.route_risk_label} score={result.route_risk_score} />
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 text-[12px]">
                 {[
                   ['Total delay risk', `${(result.cumulative_delay_prob * 100).toFixed(1)}%`],
                   ['Expected delay',   `${result.expected_total_delay_days?.toFixed(1)}d`],
@@ -283,9 +306,9 @@ export default function RouteSimulator() {
                   ['Waypoints',        result.waypoints.length],
                   ['Ports touched',    result.all_ports.length],
                 ].map(([k, v]) => (
-                  <div key={k} className="bg-gray-900/50 rounded-lg p-2">
-                    <div className="text-gray-500">{k}</div>
-                    <div className="text-white font-semibold mt-0.5">{v}</div>
+                  <div key={k} className="bg-abyss/50 rounded-lg px-2.5 py-2">
+                    <div className="text-ink-dim text-[10px] uppercase tracking-wider">{k}</div>
+                    <div className="text-ink font-mono font-semibold mt-1 tabular-nums">{v}</div>
                   </div>
                 ))}
               </div>
@@ -294,10 +317,10 @@ export default function RouteSimulator() {
             {/* Waypoints */}
             {result.waypoints.length > 0 && (
               <div>
-                <h3 className="text-gray-400 text-xs uppercase tracking-wide mb-2">Routing via</h3>
+                <FieldLabel>Routing via</FieldLabel>
                 <div className="flex flex-wrap gap-1.5">
                   {result.waypoints.map((lc, i) => (
-                    <span key={i} className="bg-gray-800 border border-gray-700 text-gray-300 text-xs px-2 py-1 rounded-full">
+                    <span key={i} className="bg-hull-2 border hairline text-ink-mute text-[11px] px-2 py-1 rounded-md">
                       {result.waypoint_names[i]}
                     </span>
                   ))}
@@ -307,27 +330,27 @@ export default function RouteSimulator() {
 
             {/* Segments */}
             <div>
-              <h3 className="text-gray-400 text-xs uppercase tracking-wide mb-2">Segment Risk</h3>
-              <div className="space-y-2">
+              <FieldLabel>Segment risk</FieldLabel>
+              <div className="space-y-1.5">
                 {result.segments.map((seg, i) => (
-                  <div key={i} className="flex items-center gap-3 bg-gray-800 rounded-lg px-3 py-2">
-                    <div
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  <div key={i} className="flex items-center gap-3 bg-hull-2 rounded-lg px-3 py-2">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
                       style={{ background: labelToColor(seg.risk_label) }}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-white text-xs font-medium truncate">{seg.from_name}</div>
-                      <div className="text-gray-500 text-xs">P(delay): {(seg.delay_prob * 100).toFixed(0)}%</div>
+                      <div className="text-ink text-[12px] font-medium truncate">{seg.from_name}</div>
+                      <div className="text-ink-dim text-[11px] font-mono">P(delay) {(seg.delay_prob * 100).toFixed(0)}%</div>
                     </div>
-                    <span className="text-gray-400 text-xs">{Math.round(seg.risk_score)}</span>
+                    <span className="text-ink-mute text-[12px] font-mono tabular-nums">{Math.round(seg.risk_score)}</span>
                   </div>
                 ))}
                 {/* Destination */}
-                <div className="flex items-center gap-3 bg-gray-800 rounded-lg px-3 py-2">
-                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: '#6b7280' }} />
+                <div className="flex items-center gap-3 bg-hull-2 rounded-lg px-3 py-2">
+                  <span className="w-2 h-2 rounded-full shrink-0 bg-ink-dim" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-gray-300 text-xs font-medium truncate">{result.destination_name}</div>
-                    <div className="text-gray-500 text-xs">Destination</div>
+                    <div className="text-ink-mute text-[12px] font-medium truncate">{result.destination_name}</div>
+                    <div className="text-ink-dim text-[11px]">Destination</div>
                   </div>
                 </div>
               </div>
@@ -353,9 +376,9 @@ export default function RouteSimulator() {
                 id="route-line"
                 type="line"
                 paint={{
-                  'line-color': '#3b82f6',
+                  'line-color': '#56c8d8',
                   'line-width': 2.5,
-                  'line-opacity': 0.8,
+                  'line-opacity': 0.85,
                   'line-dasharray': [4, 2],
                 }}
               />
@@ -367,7 +390,7 @@ export default function RouteSimulator() {
             const p = portMap[lc];
             if (!p) return null;
             const seg = result.segments.find(s => s.from_port === lc);
-            const color = seg ? labelToColor(seg.risk_label) : '#6b7280';
+            const color = seg ? labelToColor(seg.risk_label) : '#5a6e80';
             const isEndpoint = i === 0 || i === result.all_ports.length - 1;
             return (
               <Marker key={lc} longitude={p.lon} latitude={p.lat} anchor="center">
@@ -376,12 +399,12 @@ export default function RouteSimulator() {
                     <circle
                       cx={isEndpoint ? 10 : 7} cy={isEndpoint ? 10 : 7}
                       r={isEndpoint ? 9 : 6}
-                      fill={color} fillOpacity={0.8}
-                      stroke="white" strokeWidth={isEndpoint ? 2 : 1}
+                      fill={color} fillOpacity={0.85}
+                      stroke="#e6edf3" strokeWidth={isEndpoint ? 2 : 1}
                     />
                   </svg>
                   {isEndpoint && (
-                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-white text-xs font-semibold whitespace-nowrap bg-gray-900/80 px-1.5 py-0.5 rounded">
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-ink text-[11px] font-mono font-medium whitespace-nowrap bg-hull/90 border hairline px-1.5 py-0.5 rounded">
                       {p.port_name}
                     </div>
                   )}
@@ -393,9 +416,10 @@ export default function RouteSimulator() {
 
         {!result && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center">
-              <div className="text-4xl mb-3">🚢</div>
-              <div className="text-gray-400 text-sm">Select origin and destination,<br />then simulate a route</div>
+            <div className="text-center bg-abyss/70 backdrop-blur-sm border hairline rounded-xl px-8 py-6">
+              <Compass size={28} className="text-signal mx-auto mb-3" />
+              <div className="text-ink text-[13px] font-medium mb-0.5">Plot a route</div>
+              <div className="text-ink-mute text-[12px]">Pick origin and destination ports,<br />then simulate to see cumulative risk</div>
             </div>
           </div>
         )}
