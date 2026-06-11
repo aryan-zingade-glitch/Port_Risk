@@ -23,10 +23,6 @@ from sklearn.metrics import (
 import xgboost as xgb
 import lightgbm as lgb
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
 ROOT      = Path(__file__).parent.parent
 MODELS    = ROOT / "models"
 PROCESSED = ROOT / "data/processed"
@@ -318,6 +314,12 @@ def train_regressor(fit_train: pd.DataFrame, val: pd.DataFrame,
 # ---------------------------------------------------------------------------
 
 def run_shap(clf, reg, test: pd.DataFrame, feat_cols: list):
+    # matplotlib is only needed for these training-time plots; keep the import
+    # lazy so the API (which deploys without matplotlib) can import this module
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     print("\n--- SHAP Analysis ---")
 
     X_te = test[feat_cols].astype(float)

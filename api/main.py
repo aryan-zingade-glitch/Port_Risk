@@ -69,6 +69,14 @@ def load_data():
     latest_idx = rs.groupby("locode").apply(lambda g: (g.year * 12 + g.month).idxmax())
     _data["latest_risk"] = rs.loc[latest_idx.values].set_index("locode")
 
+    # Pre-compute: per-port 2024 feature medians for the SHAP waterfall.
+    # Engineering 51k rows per request was too slow (and OOM-prone on Render).
+    from models.train_pipeline import engineer_features, get_feature_cols
+    vc_eng = engineer_features(_data["vessel_calls"])
+    fc     = get_feature_cols(vc_eng)
+    eng_2024 = vc_eng[vc_eng["year"] == 2024]
+    _data["feat_medians_2024"] = eng_2024.groupby("port_code")[fc].median()
+
     print(f"  Loaded {len(_data['port_master'])} ports, "
           f"{len(_data['risk_scores'])} risk-score rows, "
           f"{len(_data['vessel_calls'])} vessel calls.")
@@ -354,13 +362,9 @@ def get_port_detail(port_code: str):
         else:
             shap_vals = shap_df.mean()
 
-        # Feature values: median for this port in 2024
-        from models.train_pipeline import engineer_features, get_feature_cols
-        import warnings; warnings.filterwarnings("ignore")
-        vc_eng    = engineer_features(vc)
-        fc        = get_feature_cols(vc_eng)
-        port_feats = vc_eng[(vc_eng["port_code"] == lc) & (vc_eng["year"] == 2024)]
-        feat_medians = port_feats[fc].median() if len(port_feats) > 0 else pd.Series(dtype=float)
+        # Feature values: median for this port in 2024 (precomputed at startup)
+        fm = _data["feat_medians_2024"]
+        feat_medians = fm.loc[lc] if lc in fm.index else pd.Series(dtype=float)
     else:
         shap_vals    = shap_df.mean()
         feat_medians = pd.Series(dtype=float)
