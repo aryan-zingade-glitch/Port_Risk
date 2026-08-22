@@ -1,0 +1,32 @@
+# Keeps the Render service from sleeping.
+#
+# Render's free tier spins a service down after ~15 minutes without traffic, and
+# the next request then pays a 30-60s cold boot. The map no longer cares (it
+# renders from a static snapshot), but port drilldowns and route simulation are
+# still live calls, so a warm backend keeps those instant for anyone opening the
+# demo link.
+#
+# Cost note: this holds the service up ~24/7, which uses roughly 730 of the free
+# tier's 750 instance-hours per month. That is fine for a single service and
+# leaves almost no headroom for a second one.
+name: Keep API awake
+
+on:
+  schedule:
+    # Every 10 minutes — comfortably inside Render's ~15 minute idle window.
+    # GitHub may delay scheduled runs under load, hence the margin.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 120 \
+            https://nautiq-api.onrender.com/health)
+          echo "health returned $code"
+          # A cold boot can still outlast the timeout; that ping did its job by
+          # starting the container, so don't fail the workflow over it.
+          [ "$code" = "200" ] || echo "::warning::non-200 ($code) — likely a cold start in progress"

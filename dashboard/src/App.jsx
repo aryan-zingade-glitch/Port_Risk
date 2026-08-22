@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Anchor, MapTrifold, Path } from '@phosphor-icons/react';
+import { wakeApi } from './api';
 import WorldRiskMap from './components/WorldRiskMap';
 import PortDrilldown from './components/PortDrilldown';
 import RouteSimulator from './components/RouteSimulator';
@@ -12,6 +13,11 @@ const NAV = [
 export default function App() {
   const [panel,        setPanel]        = useState('map');
   const [selectedPort, setSelectedPort] = useState(null);
+
+  // The map renders from a static snapshot, but drilldowns and route simulation
+  // still hit the backend. Start booting it now, while the user is reading the
+  // map, so it's warm by the time they click into either.
+  useEffect(() => { wakeApi(); }, []);
 
   return (
     <div className="flex flex-col h-dvh bg-abyss text-ink overflow-hidden">

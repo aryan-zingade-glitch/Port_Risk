@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 import { X } from '@phosphor-icons/react';
-import { getPort } from '../api';
+import { getPort, onColdStart } from '../api';
 import RiskBadge from './RiskBadge';
 import { RISK_COLORS } from '../utils/colors';
 
@@ -32,6 +32,11 @@ export default function PortDrilldown({ portCode, onClose }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
+  const [waking,  setWaking]  = useState(false);
+
+  // Drilldown detail is one of the few things still fetched live, so a cold
+  // backend can stall it; say so rather than showing a skeleton indefinitely.
+  useEffect(() => onColdStart(setWaking), []);
 
   useEffect(() => {
     if (!portCode) return;
@@ -77,7 +82,16 @@ export default function PortDrilldown({ portCode, onClose }) {
         </button>
       </div>
 
-      {loading && <DrilldownSkeleton />}
+      {loading && (
+        <>
+          {waking && (
+            <div className="px-5 pt-4 text-ink-dim text-[11px] leading-relaxed">
+              Waking the API — first request after idle can take up to a minute.
+            </div>
+          )}
+          <DrilldownSkeleton />
+        </>
+      )}
 
       {error && (
         <div className="flex-1 flex items-center justify-center text-risk-high text-[13px]">{error}</div>

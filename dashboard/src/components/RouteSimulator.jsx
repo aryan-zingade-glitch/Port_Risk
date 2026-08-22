@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Map, { Marker, Source, Layer, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Compass, ArrowDown } from '@phosphor-icons/react';
-import { getPorts, getRoute } from '../api';
+import { getSnapshot, getRoute, onColdStart } from '../api';
 import { labelToColor } from '../utils/colors';
 import RiskBadge from './RiskBadge';
 
@@ -192,14 +192,20 @@ export default function RouteSimulator() {
   const [loading,  setLoading] = useState(false);
   const [error,    setError]   = useState(null);
   const [portMap,  setPortMap] = useState({});
+  const [waking,   setWaking]  = useState(false);
 
+  // The API sleeps when idle; a slow call is a wake-up, not a failure.
+  useEffect(() => onColdStart(setWaking), []);
+
+  // Port list comes from the static snapshot so the selectors are usable the
+  // moment the view opens. Only the simulation itself needs the live API.
   useEffect(() => {
-    getPorts().then(data => {
+    getSnapshot().then(({ ports: data }) => {
       setPorts(data);
       const m = {};
       data.forEach(p => { m[p.locode] = p; });
       setPortMap(m);
-    }).catch(() => setError('Cannot reach API'));
+    }).catch(() => setError('Could not load port list.'));
   }, []);
 
   const simulate = () => {
@@ -273,10 +279,15 @@ export default function RouteSimulator() {
             className="pressable w-full bg-signal-deep hover:bg-signal text-abyss font-semibold py-2.5 rounded-lg text-[13px]
                        disabled:bg-hull-2 disabled:text-ink-dim disabled:cursor-not-allowed"
           >
-            {loading ? 'Simulating…' : 'Simulate route'}
+            {loading ? (waking ? 'Waking the API…' : 'Simulating…') : 'Simulate route'}
           </button>
 
           {error && <p className="text-risk-high text-[12px]">{error}</p>}
+          {waking && !error && (
+            <p className="text-ink-dim text-[11px] leading-relaxed">
+              The backend sleeps when idle. This can take up to a minute.
+            </p>
+          )}
         </div>
 
         {/* Results */}

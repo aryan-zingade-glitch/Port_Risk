@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Warning, Lightning } from '@phosphor-icons/react';
-import { getPorts, getRiskScores } from '../api';
+import { getSnapshot } from '../api';
 import { scoreToColor, tierToRadius } from '../utils/colors';
 import RiskBadge from './RiskBadge';
 
@@ -40,30 +40,24 @@ export default function WorldRiskMap({ onPortSelect }) {
   const [error,      setError]      = useState(null);
   const riskCache = useRef({});
 
-  // Load port list once
+  // Ports and every month of risk scores ship with the app as a static
+  // snapshot, so the map draws immediately off the CDN rather than waiting on
+  // the backend to wake up. Scrubbing the timeline stays instant too.
   useEffect(() => {
-    getPorts()
-      .then(data => { setPorts(data); setLoading(false); })
-      .catch(() => setError('Cannot reach API — is the backend running?'));
+    getSnapshot()
+      .then(({ ports, riskScores }) => {
+        setPorts(ports);
+        riskCache.current = riskScores;
+        setLoading(false);
+      })
+      .catch(() => setError('Could not load map data. Try reloading the page.'));
   }, []);
 
-  // Load risk scores when slider changes
+  // Swap in the month the slider points at.
   useEffect(() => {
     const { year, month } = ALL_MONTHS[sliderIdx];
-    const key = `${year}-${month}`;
-    if (riskCache.current[key]) {
-      setRiskMap(riskCache.current[key]);
-      return;
-    }
-    getRiskScores(year, month)
-      .then(data => {
-        const m = {};
-        data.forEach(d => { m[d.locode] = d; });
-        riskCache.current[key] = m;
-        setRiskMap(m);
-      })
-      .catch(() => {});
-  }, [sliderIdx]);
+    setRiskMap(riskCache.current[`${year}-${month}`] || {});
+  }, [sliderIdx, loading]);
 
   const curMonth = ALL_MONTHS[sliderIdx];
   const shock = SHOCK_EVENTS.find(e => e.year === curMonth.year && e.month === curMonth.month);
@@ -76,11 +70,8 @@ export default function WorldRiskMap({ onPortSelect }) {
     <div className="flex-1 flex items-center justify-center bg-abyss">
       <div className="text-center max-w-xs">
         <Warning size={28} className="text-risk-high mx-auto mb-3" />
-        <div className="text-ink text-[15px] font-semibold mb-1">API unavailable</div>
+        <div className="text-ink text-[15px] font-semibold mb-1">Map data unavailable</div>
         <div className="text-ink-mute text-[13px]">{error}</div>
-        <div className="text-ink-dim text-[11px] font-mono mt-3 bg-hull border hairline rounded-md px-3 py-2">
-          uvicorn api.main:app --port 8000
-        </div>
       </div>
     </div>
   );
